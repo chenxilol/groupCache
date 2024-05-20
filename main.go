@@ -15,7 +15,7 @@ var db = map[string]string{
 }
 
 func createGroup() *Group {
-	return NewGroup("scores", 2<<10, 4*time.Second, GetterFunc(
+	return NewGroup("scores", 2<<10, time.Second, GetterFunc(
 		func(key string) ([]byte, error) {
 			log.Println("[SlowDB] search key", key)
 			if v, ok := db[key]; ok {
@@ -39,7 +39,6 @@ func main() {
 	flag.IntVar(&port, "port", 8001, "Geecache server port")
 	flag.BoolVar(&api, "api", false, "Start a api server?")
 	flag.Parse()
-
 	addrMap := map[int]string{
 		8001: "http://localhost:8001",
 		8002: "http://localhost:8002",

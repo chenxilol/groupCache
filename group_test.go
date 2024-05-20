@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"testing"
+	"time"
 )
 
 func TestGet(t *testing.T) {
 	loadCounts := make(map[string]int, len(db))
-	gee := NewGroup("scores", 2<<10, GetterFunc(
+	gee := NewGroup("scores", 2<<10, 0, GetterFunc(
 		func(key string) ([]byte, error) {
 			log.Println("[SlowDB] search key", key)
 			if v, ok := db[key]; ok {
@@ -32,5 +34,20 @@ func TestGet(t *testing.T) {
 
 	if view, err := gee.Get("unknown"); err == nil {
 		t.Fatalf("the value of unknow should be empty, but %s got", view)
+	}
+}
+
+func TestName(t *testing.T) {
+	ticker := time.Tick(200 * time.Millisecond)
+	for {
+		select {
+		case <-ticker:
+			get, err := http.Get("http://localhost:8001/groupCache/scores/Tom")
+			if err != nil {
+				log.Println("err", err)
+				return
+			}
+			fmt.Println(get.Body)
+		}
 	}
 }

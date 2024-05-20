@@ -35,7 +35,7 @@ func New(maxBytes int64, onEvicted func(key string, value Value)) *Cache {
 		ll:        list.New(),
 		cache:     map[string]*list.Element{},
 		OnEvicted: onEvicted,
-		interval:  time.Second,
+		interval:  time.Millisecond,
 		stopCh:    make(chan struct{}),
 	}
 	go cache.evictExpiredItems()
@@ -78,7 +78,11 @@ func (c *Cache) Add(key string, expire time.Duration, value Value) {
 		c.nBytes += int64(len(key)) + int64(kv.value.Len())
 		kv.value = value
 	} else {
-		ele := c.ll.PushFront(&entry{key: key, value: value, expire: time.Now().Add(expire)})
+		expires := time.Now().Add(expire)
+		if expire == 0 {
+			expires = time.Time{}
+		}
+		ele := c.ll.PushFront(&entry{key: key, value: value, expire: expires})
 		c.cache[key] = ele
 		c.nBytes += int64(len(key)) + int64(value.Len())
 	}
