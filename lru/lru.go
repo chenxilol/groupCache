@@ -14,6 +14,8 @@ type Cache struct {
 	ll        *list.List
 	cache     map[string]*list.Element
 	OnEvicted func(key string, value Value)
+	interval  time.Duration
+	stopCh    chan struct{}
 }
 
 type Value interface {
@@ -28,12 +30,16 @@ type entry struct {
 
 // New creates a new Cache.
 func New(maxBytes int64, onEvicted func(key string, value Value)) *Cache {
-	return &Cache{
+	cache := &Cache{
 		maxBytes:  maxBytes,
 		ll:        list.New(),
 		cache:     map[string]*list.Element{},
 		OnEvicted: onEvicted,
+		interval:  time.Second,
+		stopCh:    make(chan struct{}),
 	}
+	go cache.evictExpiredItems()
+	return cache
 }
 
 // Get looks up a key's value from the cache.
@@ -61,7 +67,7 @@ func (c *Cache) RemoveOldest() {
 }
 
 // Add adds a value to the cache.
-func (c *Cache) Add(key string, value Value) {
+func (c *Cache) Add(key string, expire time.Duration, value Value) {
 	if c.cache == nil {
 		c.cache = make(map[string]*list.Element)
 		c.ll = list.New()
@@ -72,11 +78,44 @@ func (c *Cache) Add(key string, value Value) {
 		c.nBytes += int64(len(key)) + int64(kv.value.Len())
 		kv.value = value
 	} else {
-		ele := c.ll.PushFront(&entry{key: key, value: value})
+		ele := c.ll.PushFront(&entry{key: key, value: value, expire: time.Now().Add(expire)})
 		c.cache[key] = ele
 		c.nBytes += int64(len(key)) + int64(value.Len())
 	}
 	for c.nBytes > c.maxBytes && c.maxBytes != 0 {
 		c.RemoveOldest()
 	}
+}
+
+// 检测lru链表中过期的元素
+func (c *Cache) removeElement(e *list.Element) {
+	kv := e.Value.(*entry)
+	c.ll.Remove(e)
+	delete(c.cache, kv.key)
+	c.nBytes -= int64(len(kv.key)) + int64(kv.value.Len())
+	if c.OnEvicted != nil {
+		c.OnEvicted(kv.key, kv.value)
+	}
+}
+func (c *Cache) evictExpiredItems() {
+	ticker := time.NewTicker(c.interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			for e := c.ll.Back(); e != nil; e = e.Prev() {
+				kv := e.Value.(*entry)
+				if !kv.expire.IsZero() && time.Now().After(kv.expire) {
+					c.removeElement(e)
+				} else {
+					break
+				}
+			}
+		case <-c.stopCh:
+			return
+		}
+	}
+}
+func (c *Cache) Stop() {
+	close(c.stopCh)
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"sync"
+	"time"
 )
 
 // 接口型函数 :定义一个函数类型 F，并且实现接口 A 的方法，然后在这个方法中调用自己。
@@ -28,6 +29,7 @@ type Group struct {
 	getter    Getter
 	mainCache cache
 	peers     PeerPicker
+	Expire    time.Duration
 }
 
 var (
@@ -35,7 +37,8 @@ var (
 	group = make(map[string]*Group)
 )
 
-func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
+// NewGroup name 为Group名字，cacheBytes为缓存的大小，Expire 为获取本地的数据的键值过期时间，
+func NewGroup(name string, cacheBytes int64, expire time.Duration, getter Getter) *Group {
 	mu.Lock()
 	defer mu.Unlock()
 	if getter == nil {
@@ -45,6 +48,7 @@ func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 		name:      name,
 		mainCache: cache{cacheBytes: cacheBytes},
 		getter:    getter,
+		Expire:    expire,
 	}
 	group[name] = g
 	return g
@@ -83,7 +87,8 @@ func (g *Group) getLocally(key string) (ByteView, error) {
 }
 
 func (g *Group) populateCache(key string, bytesView ByteView) {
-	g.mainCache.add(key, bytesView, 0)
+	// 如果设置了过期时间，则设置过期时间
+	g.mainCache.add(key, g.Expire, bytesView)
 }
 
 // RegisterPeers registers a PeerPicker for choosing remote peer
@@ -103,7 +108,6 @@ func (g *Group) load(key string) (value ByteView, err error) {
 			log.Println("[GeeCache] Failed to get from peer", err)
 		}
 	}
-
 	return g.getLocally(key)
 }
 

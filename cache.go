@@ -13,13 +13,13 @@ type cache struct {
 }
 
 // add 添加缓存
-func (c *cache) add(key string, value ByteView, ttl time.Duration) {
+func (c *cache) add(key string, expire time.Duration, value ByteView) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.lru == nil {
 		c.lru = lru.New(c.cacheBytes, nil)
 	}
-	c.lru.Add(key, value)
+	c.lru.Add(key, expire, value)
 }
 
 // get 获取缓存

@@ -29,6 +29,8 @@ func NewHTTPPool(self string) *HTTPPool {
 func (p *HTTPPool) Log(format string, v ...interface{}) {
 	log.Printf("[Server %s] %s", p.self, fmt.Sprintf(format, v...))
 }
+
+// server handel
 func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, defaultBasePath) {
 		panic("HTTPPool serving unexpected path: " + r.URL.Path)
@@ -100,4 +102,5 @@ func (h *httpGetter) Get(group, key string) ([]byte, error) {
 	return b, nil
 }
 
+// 检查 httpGetter 是否实现了 PeerGetter 接口
 var _ PeerGetter = (*httpGetter)(nil)
